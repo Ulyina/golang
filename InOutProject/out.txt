@@ -1,0 +1,489 @@
+Г1 Кролик Русский язык
+Г1 Тигра Физика
+Г2 Винни_Пух Пчеловодство
+
+
+
+
+main.go 
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+func main() {
+	showMenu()
+}
+
+func showMenu() {
+	var students []Student
+
+	for {
+		fmt.Println("\nМеню:")
+		fmt.Println("1. Добавить студента")
+		fmt.Println("2. Удалить студента")
+		fmt.Println("3. Редактировать студента")
+		fmt.Println("4. Распечатать всех студентов в out.txt")
+		fmt.Println("5. Выход")
+		fmt.Print("Выберите действие: ")
+
+		var choice int
+		_, err := fmt.Scanf("%d", &choice)
+		if err != nil {
+			fmt.Println("Ошибка ввода:", err)
+			continue
+		}
+
+		switch choice {
+		case 1:
+			students, err = addStudent(students)
+			if err != nil {
+				fmt.Println("Ошибка добавления студента:", err)
+			}
+		case 2:
+			students, err = removeStudent(students)
+			if err != nil {
+				fmt.Println("Ошибка удаления студента:", err)
+			}
+		case 3:
+			students, err = editStudent(students)
+			if err != nil {
+				fmt.Println("Ошибка редактирования студента:", err)
+			}
+		case 4:
+			printToOutFile(students)
+		case 5:
+			fmt.Println("Выход из программы.")
+			return
+		default:
+			fmt.Println("Некорректный выбор. Попробуйте снова.")
+		}
+	}
+}
+
+func printToOutFile(students []Student) {
+	var lines []string
+
+	// Сначала добавляем информацию из входных файлов
+	studentMap := make(map[int]Student)
+
+	// Чтение данных из файла Students.txt
+	studentData, err := ioutil.ReadFile("Students.txt")
+	if err != nil {
+		fmt.Println("Ошибка чтения файла Students.txt:", err)
+		return
+	}
+	lines = strings.Split(string(studentData), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ";")
+		id, _ := strconv.Atoi(fields[0])
+		studentMap[id] = Student{
+			ID:    id,
+			Group: fields[1],
+			Name:  fields[2],
+		}
+	}
+
+	// Чтение данных из файла Session.txt
+	sessionData, err := ioutil.ReadFile("Session.txt")
+	if err != nil {
+		fmt.Println("Ошибка чтения файла Session.txt:", err)
+		return
+	}
+	lines = strings.Split(string(sessionData), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ";")
+		id, _ := strconv.Atoi(fields[0])
+		subject := fields[1]
+		gradesStr := strings.Split(fields[2], " ")
+		grades := make([]int, len(gradesStr))
+		for i, gradeStr := range gradesStr {
+			grades[i], _ = strconv.Atoi(gradeStr)
+		}
+
+		// Добавление информации о предмете и оценках к студенту
+		if student, ok := studentMap[id]; ok {
+			student.Subject = subject
+			student.Grades = grades
+			studentMap[id] = student
+		}
+	}
+
+	// Формирование итогового списка студентов
+	for _, student := range studentMap {
+		lines = append(lines, fmt.Sprintf("%s %s %s %v", student.Group, student.Name, student.Subject, student.Grades))
+	}
+
+	sort.Strings(lines)
+
+	outFile, err := os.Create("out.txt")
+	if err != nil {
+		fmt.Println("Ошибка создания файла:", err)
+		return
+	}
+	defer outFile.Close()
+
+	writer := bufio.NewWriter(outFile)
+	for _, line := range lines {
+		fmt.Fprintf(writer, "%s\n", line)
+	}
+	writer.Flush()
+
+	fmt.Println("Результат записан в файл out.txt")
+}
+
+
+student.go
+
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type Student struct {
+	ID      int
+	Group   string
+	Name    string
+	Subject string
+	Grades  []int
+}
+
+func addStudent(students []Student) ([]Student, error) {
+	var (
+		id       int
+		group    string
+		name     string
+		subject  string
+		grades   []int
+		gradeStr string
+	)
+
+	fmt.Print("Введите ID студента: ")
+	_, err := fmt.Scanf("%d", &id)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Print("Введите группу студента: ")
+	_, err = fmt.Scanf("%s", &group)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Print("Введите имя студента: ")
+	_, err = fmt.Scanf("%s", &name)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Print("Введите предмет студента: ")
+	_, err = fmt.Scanf("%s", &subject)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Print("Введите оценки студента через пробел: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	gradeStr = scanner.Text()
+
+	gradesStr := strings.Split(gradeStr, " ")
+	for _, gradeStr := range gradesStr {
+		grade, err := strconv.Atoi(gradeStr)
+		if err != nil {
+			return nil, err
+		}
+		grades = append(grades, grade)
+	}
+
+	newStudent := Student{
+		ID:      id,
+		Group:   group,
+		Name:    name,
+		Subject: subject,
+		Grades:  grades,
+	}
+
+	return append(students, newStudent), nil
+}
+
+func removeStudent(students []Student) ([]Student, error) {
+	var id int
+	fmt.Print("Введите ID студента для удаления: ")
+	_, err := fmt.Scanf("%d", &id)
+	if err != nil {
+		return nil, err
+	}
+
+	var found bool
+	for i, student := range students {
+		if student.ID == id {
+			found = true
+			students = append(students[:i], students[i+1:]...)
+			break
+		}
+	}
+
+	if !found {
+		return students, fmt.Errorf("студент с ID %d не найден", id)
+	}
+
+	return students, nil
+}
+
+func editStudent(students []Student) ([]Student, error) {
+	var id int
+	var group, name, subject string
+	var grades []int
+
+	fmt.Print("Введите ID студента для редактирования: ")
+	_, err := fmt.Scanf("%d", &id)
+	if err != nil {
+		return nil, err
+	}
+
+	var found bool
+	for i, student := range students {
+		if student.ID == id {
+			found = true
+			fmt.Printf("Текущая группа: %s\n", student.Group)
+			fmt.Print("Введите новую группу: ")
+			fmt.Scanln(&group)
+
+			fmt.Printf("Текущее имя: %s\n", student.Name)
+			fmt.Print("Введите новое имя: ")
+			fmt.Scanln(&name)
+
+			fmt.Printf("Текущий предмет: %s\n", student.Subject)
+			fmt.Print("Введите новый предмет: ")
+			fmt.Scanln(&subject)
+
+			fmt.Printf("Текущие оценки: %v\n", student.Grades)
+			fmt.Print("Введите новые оценки через пробел: ")
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			gradeStr := scanner.Text()
+
+			gradesStr := strings.Split(gradeStr, " ")
+			for _, gradeStr := range gradesStr {
+				grade, err := strconv.Atoi(gradeStr)
+				if err != nil {
+					return nil, err
+				}
+				grades = append(grades, grade)
+			}
+
+			students[i].Group = group
+			students[i].Name = name
+			students[i].Subject = subject
+			students[i].Grades = grades
+			break
+		}
+	}
+
+	if !found {
+		return students, fmt.Errorf("студент с ID %d не найден", id)
+	}
+
+	return students, nil
+}
+
+
+эти коды работают хорошо просто  надо отредактировать вывод чтобы он был такого формата:
+
+Г1 Кролик Русский язык
+Г1 Тигра Физика
+Г2 Винни_Пух Пчеловодство
+
+группа стужент любимый предмет 
+
+
+вот в этом коде идет сортировка предметов на любимые и вывод который я хпрошу 
+
+
+
+package main
+
+import (
+	"bufio"    // Буферизированный ввод-вывод
+	"fmt"      // Форматированный ввод-вывод
+	"os"       // Операции с файлами и системой
+	"sort"     // Сортировка
+	"strconv"  // Конвертация строк в числа
+	"strings"  // Работа со строками
+)
+
+// Student - структура, представляющая информацию о студенте
+type Student struct {
+	ID       int    
+	Group    string 
+	LastName string 
+	Name     string 
+}
+
+// Session - структура, представляющая информацию о сессии студента
+type Session struct {
+	StudentID  int    
+	Subject    string 
+	Grades     []int  
+}
+
+
+func main() {
+	// Чтение информации о студентах из файла Students.txt
+	// Вызов функции readStudents
+	students, err := readStudents("Students.txt")
+	if err != nil {
+		return
+	}
+
+	// Чтение информации о сессиях студентов из файла Session.txt
+	// Вызов функции readSessions
+	sessions, err := readSessions("Session.txt")
+	if err != nil {
+		return
+	}
+
+    // пустой слайс строк favoriteSubjects, для хранения информации о студентах и дисциплинах
+	var favoriteSubjects []string
+
+	// Поиск любимых дисциплин для каждого студента
+	for _, student := range students {
+		var maxAvgGrade float64 = -1
+		var favoriteSubject string
+
+		for _, session := range sessions {
+			if session.StudentID == student.ID {
+				avgGrade := average(session.Grades)
+				if avgGrade > maxAvgGrade {
+					maxAvgGrade = avgGrade
+					favoriteSubject = session.Subject
+				}
+			}
+		}
+
+		// Добавление информации о студенте и его любимой дисциплине в список
+		if favoriteSubject != "" {
+			favoriteSubjects = append(favoriteSubjects, fmt.Sprintf("%s %s %s", student.Group, student.LastName, favoriteSubject))
+		}
+	}
+
+	// Сортировка списка любимых дисциплин по группе и фамилии студента
+	sort.Strings(favoriteSubjects)
+
+	// Запись результата в файл out.txt
+	outFile, err := os.Create("out.txt")
+	if err != nil {
+		return
+	}
+	defer outFile.Close()
+
+	writer := bufio.NewWriter(outFile)
+	for _, line := range favoriteSubjects {
+		fmt.Fprintf(writer, "%s\n", line)
+	}
+	writer.Flush()
+
+	fmt.Println("Результат записан в файл out.txt")
+}
+
+// readStudents читает информацию о студентах из файла и возвращает список студентов
+func readStudents(filename string) ([]Student, error) {
+	// Open - ткрытие файла для чтения
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close() // Закрытие файла после завершения функции
+
+	var students []Student
+	scanner := bufio.NewScanner(file) // Инициализация сканера для чтения файла построчно
+	for scanner.Scan() {
+		parts := strings.Split(scanner.Text(), ";") // Разделение строки на части по разделителю ";"
+		if len(parts) != 3 {
+			continue // Пропуск строки, если не хватает частей
+		}
+		id, err := strconv.Atoi(parts[0]) // Atoi - преобразование строки в число для идентификатора студента
+		if err != nil {
+			return nil, err
+		}
+		student := Student{
+			ID:       id,
+			Group:    parts[1],
+			LastName: parts[2],
+			Name:     parts[2],
+		}
+		students = append(students, student) // Добавление студента в список студентов
+	}
+
+	return students, scanner.Err() // Возврат списка студентов и возможной ошибки сканера
+}
+
+// readSessions читает информацию о сессиях студентов из файла и возвращает список сессий
+func readSessions(filename string) ([]Session, error) {
+	// Открытие файла для чтения
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close() // Закрытие файла после завершения функции
+
+	var sessions []Session
+	scanner := bufio.NewScanner(file) // Инициализация сканера для чтения файла построчно
+	for scanner.Scan() {
+		parts := strings.Split(scanner.Text(), ";") // Разделение строки на части по разделителю ";"
+		if len(parts) < 3 {
+			continue // Пропуск строки, если не хватает частей
+		}
+		id, err := strconv.Atoi(parts[0]) // Преобразование строки в число для идентификатора студента
+		if err != nil {
+			return nil, err
+		}
+		gradesStr := strings.Split(parts[2], " ") // Разделение строки с оценками на части по пробелу
+		var grades []int
+		for _, gradeStr := range gradesStr {
+			grade, err := strconv.Atoi(gradeStr) 
+			if err != nil {
+				return nil, err
+			}
+			grades = append(grades, grade) // Добавление оценки в список оценок
+		}
+		// Создание новой сессии студента на основе извлеченных данных
+		session := Session{
+			StudentID: id,         // Присвоение идентификатора студента
+            Subject:   parts[1],   // Присвоение дисциплины сессии
+            Grades:    grades,     // Присвоение списка оценок студента по данной сессии
+        }
+		sessions = append(sessions, session) // Добавление сессии в список сессий
+	}
+
+	return sessions, scanner.Err() // Возврат списка сессий и возможной ошибки сканера
+}
+
+
+// average вычисляет средний балл на основе списка оценок
+func average(grades []int) float64 {
+	sum := 0
+	for _, grade := range grades {
+		sum += grade
+	}
+	return float64(sum) / float64(len(grades))
+}
